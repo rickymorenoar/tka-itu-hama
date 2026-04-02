@@ -27,6 +27,10 @@ export function AIChat({ onClose }) {
     setLoading(true);
 
     try {
+      // Timeout 15 detik agar tidak stuck loading
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(`${API_BASE}/api/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -34,11 +38,18 @@ export function AIChat({ onClose }) {
           pesan: pesanUser,
           riwayat: riwayatBaru.slice(-6).map(r => ({ role: r.role, text: r.text })),
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+
       const data = await res.json();
-      setRiwayat(prev => [...prev, { role: "ai", text: data.balasan || "Maaf, ada kesalahan." }]);
-    } catch {
-      setRiwayat(prev => [...prev, { role: "ai", text: "⚠️ Gagal terhubung ke server. Pastikan backend jalan." }]);
+      const teks = data.balasan || data.message || "Maaf, ada kesalahan.";
+      setRiwayat(prev => [...prev, { role: "ai", text: teks }]);
+    } catch (err) {
+      const pesanError = err.name === "AbortError"
+        ? "⏳ Tutor AI sedang sibuk, coba lagi dalam 1 menit ya!"
+        : "⚠️ Gagal terhubung ke server. Pastikan backend jalan.";
+      setRiwayat(prev => [...prev, { role: "ai", text: pesanError }]);
     } finally {
       setLoading(false);
     }
@@ -128,6 +139,9 @@ export function AIPembahasan({ soal, jawabanUser, isBenar }) {
     setLoading(true);
     setSudahDiminta(true);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(`${API_BASE}/api/ai/pembahasan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -138,11 +152,18 @@ export function AIPembahasan({ soal, jawabanUser, isBenar }) {
           jawaban_user: jawabanUser,
           category: soal.category,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+
       const data = await res.json();
-      setPenjelasan(data.penjelasan || "Maaf, gagal mendapat penjelasan.");
-    } catch {
-      setPenjelasan("⚠️ Gagal terhubung ke server AI.");
+      setPenjelasan(data.penjelasan || data.message || "Maaf, gagal mendapat penjelasan.");
+    } catch (err) {
+      setPenjelasan(
+        err.name === "AbortError"
+          ? "⏳ AI sedang sibuk, coba lagi dalam 1 menit ya!"
+          : "⚠️ Gagal terhubung ke server AI."
+      );
     } finally {
       setLoading(false);
     }
@@ -196,19 +217,29 @@ export function AIGenerateSoal({ onSoalBaru }) {
     setLoading(true);
     setError("");
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(`${API_BASE}/api/ai/generate-soal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category, difficulty, topik }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+
       const data = await res.json();
       if (data.success) {
         onSoalBaru(data.soal);
       } else {
         setError(data.message);
       }
-    } catch {
-      setError("Gagal terhubung ke server.");
+    } catch (err) {
+      setError(
+        err.name === "AbortError"
+          ? "⏳ AI sedang sibuk, coba lagi dalam 1 menit ya!"
+          : "Gagal terhubung ke server."
+      );
     } finally {
       setLoading(false);
     }
@@ -222,7 +253,6 @@ export function AIGenerateSoal({ onSoalBaru }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {/* Kategori */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-500">Kategori</label>
           <select
@@ -236,7 +266,6 @@ export function AIGenerateSoal({ onSoalBaru }) {
           </select>
         </div>
 
-        {/* Kesulitan */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-500">Kesulitan</label>
           <select
@@ -251,7 +280,6 @@ export function AIGenerateSoal({ onSoalBaru }) {
         </div>
       </div>
 
-      {/* Topik opsional */}
       <div className="space-y-1.5">
         <label className="text-xs font-semibold text-slate-500">Topik spesifik <span className="font-normal text-slate-400">(opsional)</span></label>
         <input
@@ -295,7 +323,6 @@ export function AISaranBelajar({ soalList, hasilValidasi }) {
     setLoading(true);
     setSudahDiminta(true);
 
-    // Hitung hasil per kategori
     const kategori = ["MTK", "Verbal", "Figural"];
     const hasil = kategori.map(kat => {
       const soalKat = soalList.filter(s => s.category === kat);
@@ -306,15 +333,25 @@ export function AISaranBelajar({ soalList, hasilValidasi }) {
     const skor = Object.values(hasilValidasi).filter(Boolean).length;
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(`${API_BASE}/api/ai/saran-belajar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ skor, total: soalList.length, hasil }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+
       const data = await res.json();
-      setSaran(data.saran || "Maaf, gagal mendapat saran.");
-    } catch {
-      setSaran("⚠️ Gagal terhubung ke server AI.");
+      setSaran(data.saran || data.message || "Maaf, gagal mendapat saran.");
+    } catch (err) {
+      setSaran(
+        err.name === "AbortError"
+          ? "⏳ AI sedang sibuk, coba lagi dalam 1 menit ya!"
+          : "⚠️ Gagal terhubung ke server AI."
+      );
     } finally {
       setLoading(false);
     }
